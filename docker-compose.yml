@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  face-system:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./face_dataset:/app/face_dataset
+      - ./input_images:/app/input_images
+      - ./output:/app/output
+    environment:
+      - UPLOAD_FOLDER=input_images
+      - OUTPUT_FOLDER=output
+      - DATASET_FOLDER=face_dataset

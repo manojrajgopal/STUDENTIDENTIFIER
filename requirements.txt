@@ -1,4 +1,7 @@
-face_recognition
+Flask
 opencv-python
+deepface
 numpy
 pandas
+tf-keras
+scipy

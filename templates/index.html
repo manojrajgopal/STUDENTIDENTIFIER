@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Face Recognition System</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+    .section { margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 5px; }
+    video, canvas, img { max-width: 100%; border: 1px solid #ddd; margin: 10px 0; border-radius: 4px; }
+    button {
+      padding: 10px 15px; margin: 5px; cursor: pointer;
+      background: #4CAF50; color: white; border: none; border-radius: 4px;
+    }
+    button:hover { background: #45a049; }
+    button.secondary { background: #2196F3; }
+    button.secondary:hover { background: #0b7dda; }
+    #results { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px; }
+    .person { padding: 10px; margin: 8px 0; border-radius: 4px; }
+    .known { background: #e8f5e9; border-left: 4px solid #4CAF50; }
+    .unknown { background: #ffebee; border-left: 4px solid #f44336; }
+    .tab-content { display: none; }
+    .active { display: block; }
+    .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+    .processing { background: #fff3e0; color: #E65100; }
+    .success { background: #e8f5e9; color: #2E7D32; }
+    .error { background: #ffebee; color: #C62828; }
+    #uploadPreview { max-height: 300px; }
+    .tab-buttons { margin-bottom: 15px; }
+  </style>
+</head>
+<body>
+  <h1>Face Recognition System</h1>
+  
+  <div class="tab-buttons">
+    <button class="secondary" onclick="showTab('camera')">Camera</button>
+    <button class="secondary" onclick="showTab('upload')">Upload Image</button>
+  </div>
+
+  <!-- Camera Tab -->
+  <div id="camera" class="tab-content active">
+    <div class="section">
+      <video id="video" autoplay playsinline></video>
+      <div>
+        <button id="captureBtn">Capture Photo</button>
+      </div>
+      <canvas id="canvas" style="display:none;"></canvas>
+      <img id="photo" alt="Captured photo">
+      
+      <div id="actionButtons" style="display:none;">
+        <button id="identifyBtn">Identify Faces</button>
+        <button id="registerBtn" class="secondary">Register Person</button>
+      </div>
+    </div>
+    
+    <!-- Registration Form -->
+<div id="registerForm" style="display:none;">
+  <h3>Register New Person</h3>
+  <input type="text" id="personName" placeholder="Enter full name" required>
+  <button id="confirmRegister">Register</button>
+  <div id="registerStatus"></div>
+</div>
+
+    <!-- Results Section -->
+    <div id="results" style="display:none;"></div>
+  </div>
+
+  <!-- Upload Tab -->
+  <div id="upload" class="tab-content">
+    <div class="section">
+      <h3>Upload Image</h3>
+      <input type="file" id="uploadFile" accept="image/*">
+      <button id="uploadBtn" class="secondary">Upload & Process</button>
+      <div id="uploadStatus" class="status"></div>
+      <div class="upload-results">
+        <img id="uploadPreview">
+        <div id="uploadResults"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // DOM Elements
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const photo = document.getElementById('photo');
+  const captureBtn = document.getElementById('captureBtn');
+  const identifyBtn = document.getElementById('identifyBtn');
+  const registerBtn = document.getElementById('registerBtn');
+  const actionButtons = document.getElementById('actionButtons');
+  const registerForm = document.getElementById('registerForm');
+  const confirmRegister = document.getElementById('confirmRegister');
+  const personName = document.getElementById('personName');
+  const resultsDiv = document.getElementById('results');
+  const registerStatus = document.getElementById('registerStatus');
+  const uploadFile = document.getElementById('uploadFile');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const uploadStatus = document.getElementById('uploadStatus');
+  const uploadPreview = document.getElementById('uploadPreview');
+  const uploadResults = document.getElementById('uploadResults');
+
+  // Current captured image data
+  let currentCapture = null;
+
+  // Tab navigation
+  function showTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    document.getElementById(tabName).classList.add('active');
+  }
+
+  // Start camera
+  function startCamera() {
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+        video.style.display = 'block';
+      })
+      .catch(err => {
+        console.error("Camera error:", err);
+        alert("Could not access camera: " + err.message);
+      });
+  }
+
+  // Initialize camera when camera tab is shown
+  document.querySelector('.tab-buttons').addEventListener('click', function(e) {
+    if (e.target.textContent === 'Camera') {
+      startCamera();
+    }
+  });
+
+  // Initial camera start
+  startCamera();
+
+  // Capture photo
+  captureBtn.addEventListener('click', () => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    
+    currentCapture = canvas.toDataURL('image/jpeg', 0.9);
+    photo.src = currentCapture;
+    actionButtons.style.display = 'block';
+    resultsDiv.style.display = 'none';
+    
+    // Send to backend
+    fetch('/capture', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: currentCapture })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) throw new Error(data.error);
+      console.log("Image captured and saved");
+    })
+    .catch(err => {
+      console.error("Capture failed:", err);
+      alert("Capture failed: " + err.message);
+    });
+  });
+
+  // Identify faces
+  identifyBtn.addEventListener('click', () => {
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = '<div class="status processing">Processing image...</div>';
+    
+    fetch('/identify')
+      .then(res => {
+        if (!res.ok) throw new Error('Server error');
+        return res.json();
+      })
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        
+        if (data.status === "no_faces") {
+          resultsDiv.innerHTML = '<div class="status">No faces detected</div>';
+          return;
+        }
+        
+        // Display results
+        let html = '<h3>Recognition Results:</h3>';
+        data.results.forEach(result => {
+          const confidence = Math.round(result[2] * 100);
+          const className = result[0] === "Unknown" ? "unknown" : "known";
+          html += `<div class="person ${className}">${result[0]} (${confidence}% confidence)</div>`;
+        });
+        
+        resultsDiv.innerHTML = html;
+        
+        // Show annotated image
+        const img = document.createElement('img');
+        img.src = '/output/annotated.jpg?t=' + new Date().getTime();
+        resultsDiv.appendChild(img);
+      })
+      .catch(err => {
+        console.error("Identification failed:", err);
+        resultsDiv.innerHTML = `<div class="status error">Error: ${err.message}</div>`;
+      });
+  });
+
+  // Start registration process
+  registerBtn.addEventListener('click', () => {
+    registerForm.style.display = 'block';
+    actionButtons.style.display = 'none';
+    resultsDiv.style.display = 'none';
+  });
+
+  // Complete registration
+// Complete registration
+confirmRegister.addEventListener('click', () => {
+    const name = personName.value.trim();
+    if (!name) {
+      alert("Please enter a name");
+      return;
+    }
+    
+    if (!currentCapture) {
+      alert("No captured image available");
+      return;
+    }
+    
+    registerStatus.innerHTML = '<div class="status processing">Registering person...</div>';
+    
+    fetch('/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, image: currentCapture })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) throw new Error(data.error);
+      
+      registerStatus.innerHTML = `
+        <div class="status success">
+          Successfully registered ${data.name}!<br>
+          File saved as: ${data.filename}
+        </div>
+      `;
+      
+      // Reset form
+      personName.value = '';
+      registerForm.style.display = 'none';
+      actionButtons.style.display = 'block';
+    })
+    .catch(err => {
+      console.error("Registration failed:", err);
+      registerStatus.innerHTML = `<div class="status error">Error: ${err.message}</div>`;
+    });
+});
+
+  // Upload functionality
+  uploadFile.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        uploadPreview.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  uploadBtn.addEventListener('click', function() {
+    if (!uploadFile.files || !uploadFile.files[0]) {
+      alert('Please select an image first');
+      return;
+    }
+
+    uploadStatus.innerHTML = '<div class="status processing">Uploading image...</div>';
+    uploadResults.innerHTML = '';
+
+    const formData = new FormData();
+    formData.append('file', uploadFile.files[0]);
+
+    fetch('/upload', {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Upload failed');
+      return res.json();
+    })
+    .then(data => {
+      if (data.error) throw new Error(data.error);
+      
+      uploadStatus.innerHTML = '<div class="status processing">Processing image...</div>';
+      
+      // Process the uploaded image
+      return fetch('/identify');
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Processing failed');
+      return res.json();
+    })
+    .then(data => {
+      uploadStatus.innerHTML = '<div class="status success">Processing complete!</div>';
+      
+      if (data.error) {
+        uploadResults.innerHTML = `<div class="status error">Error: ${data.error}</div>`;
+        return;
+      }
+      
+      if (!data.results || data.results.length === 0) {
+        uploadResults.innerHTML = '<div class="status">No faces detected in the uploaded image</div>';
+        return;
+      }
+      
+      let html = '<h3>Recognition Results:</h3>';
+      data.results.forEach(result => {
+        const confidence = Math.round(result[2] * 100);
+        const className = result[0] === "Unknown" ? "unknown" : "known";
+        html += `<div class="person ${className}">${result[0]} (${confidence}% confidence)</div>`;
+      });
+      uploadResults.innerHTML = html;
+      
+      // Show annotated image
+      const img = document.createElement('img');
+      img.src = '/output/annotated.jpg?' + new Date().getTime();
+      uploadResults.appendChild(img);
+    })
+    .catch(err => {
+      console.error("Upload failed:", err);
+      uploadStatus.innerHTML = `<div class="status error">Error: ${err.message}</div>`;
+    });
+  });
+</script>
+</body>
+</html>
