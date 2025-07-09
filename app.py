@@ -8,6 +8,8 @@ from scipy.spatial.distance import cosine
 from deepface import DeepFace
 from datetime import datetime
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 
