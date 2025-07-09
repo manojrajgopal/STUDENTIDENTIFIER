@@ -1,7 +1,10 @@
 Flask>=2.0
 numpy>=1.19
-opencv-python-headless>=4.5.5.62
-deepface>=0.0.78
+pandas>=1.1
 scipy>=1.4
+opencv-python-headless>=4.5
+deepface>=0.0.78
 python-dotenv>=1.0
+gunicorn>=20.1
 Werkzeug>=2.0
+tf-keras>=2.11
