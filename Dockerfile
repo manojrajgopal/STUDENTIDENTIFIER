@@ -1,7 +1,7 @@
-# Use a base image with Python and system libraries
-FROM python:3.10-slim
+# Use a base image with Python
+FROM python:3.9-slim
 
-# Install system dependencies
+# Install system dependencies (for opencv, deepface)
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -11,14 +11,15 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy project files
-COPY . /app
+# Copy project files into the container
+COPY . .
 
 # Install Python dependencies
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose the port
+# Expose the port Flask will run on
 EXPOSE 5000
 
-# Run the app
-CMD ["python", "app.py"]
+# Start the Flask app using Gunicorn (better than raw python for production)
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000"]
