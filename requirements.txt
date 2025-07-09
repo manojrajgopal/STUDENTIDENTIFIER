@@ -1,7 +1,7 @@
-Flask
-opencv-python
-deepface
-numpy
-pandas
-tf-keras
-scipy
+Flask>=2.0
+opencv-python-headless>=4.5.5.62
+deepface>=0.0.78
+numpy>=1.19
+pandas>=1.1
+tensorflow>=2.8
+scipy>=1.4
